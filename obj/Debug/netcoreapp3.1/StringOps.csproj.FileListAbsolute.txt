@@ -1,0 +1,10 @@
+E:\Repos\StringOps\bin\Debug\netcoreapp3.1\StringOps.deps.json
+E:\Repos\StringOps\bin\Debug\netcoreapp3.1\StringOps.dll
+E:\Repos\StringOps\bin\Debug\netcoreapp3.1\StringOps.pdb
+E:\Repos\StringOps\obj\Debug\netcoreapp3.1\StringOps.csproj.AssemblyReference.cache
+E:\Repos\StringOps\obj\Debug\netcoreapp3.1\StringOps.GeneratedMSBuildEditorConfig.editorconfig
+E:\Repos\StringOps\obj\Debug\netcoreapp3.1\StringOps.AssemblyInfoInputs.cache
+E:\Repos\StringOps\obj\Debug\netcoreapp3.1\StringOps.AssemblyInfo.cs
+E:\Repos\StringOps\obj\Debug\netcoreapp3.1\StringOps.csproj.CoreCompileInputs.cache
+E:\Repos\StringOps\obj\Debug\netcoreapp3.1\StringOps.dll
+E:\Repos\StringOps\obj\Debug\netcoreapp3.1\StringOps.pdb

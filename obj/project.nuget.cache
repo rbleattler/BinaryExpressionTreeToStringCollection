@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "ISnhaqAHEyp4Owgix1X58eZfcI+LMmRle9Yj/kmToaFrVQgyrrpxFcvUkgGduw8iS0SjGe4Mddw8QVHGTA1cKA==",
+  "dgSpecHash": "Ufr7U5frEtByJaM23yAofVsbQ0t8yM4F25GVSdCkTG8JraR16TMP8+rK1E0KZHcn1XvoryHh7GmeI2g0ngtesQ==",
   "success": true,
   "projectFilePath": "E:\\Repos\\StringOps\\StringOps.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\rblea\\.nuget\\packages\\microsoft.csharp\\4.7.0\\microsoft.csharp.4.7.0.nupkg.sha512",
     "C:\\Users\\rblea\\.nuget\\packages\\newtonsoft.json\\13.0.1\\newtonsoft.json.13.0.1.nupkg.sha512",
     "C:\\Users\\rblea\\.nuget\\packages\\nreco.lambdaparser\\1.0.12\\nreco.lambdaparser.1.0.12.nupkg.sha512"
   ],
