@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
 using NReco.Linq;
 
 namespace StringOps {
-    public class BinaryExpressionTreeParser {
+    public class BinaryExpressionTreeParser : BinaryExpressionTreeUtilities {
         private LambdaParser LambdaParser = new LambdaParser ();
         public ArrayList ToStringCollection (string treeAsString) {
             return ToStringCollection (LambdaParser.Parse (treeAsString) as BinaryExpression);
@@ -19,7 +21,10 @@ namespace StringOps {
             return outerList;
         }
 
-        private ArrayList BuildList (BinaryExpression evalExpression, ref ArrayList referenceList, ref ArrayList mainList) {
+        public ArrayList BuildList (BinaryExpression evalExpression, ref ArrayList referenceList, ref ArrayList mainList) {
+            return BuildList (evalExpression, ref referenceList, ref mainList, false);
+        }
+        private ArrayList BuildList (BinaryExpression evalExpression, ref ArrayList referenceList, ref ArrayList mainList, bool isMemberless) {
             Dictionary<string, bool> memberAccessMap = new Dictionary<string, bool> () {
                 {
                 "left",
@@ -36,6 +41,7 @@ namespace StringOps {
             // -- add both to reference list and return the list
 
             if (memberAccessMap["left"] && memberAccessMap["right"]) {
+                ArrayList memberLessList = new ArrayList ();
                 var leftMember = evalExpression.Left as MemberExpression;
                 var rightMember = evalExpression.Right as MemberExpression;
                 var leftString = leftMember.Expression.ToString ();
@@ -52,19 +58,111 @@ namespace StringOps {
                     ArrayList clonedList = new ArrayList ();
                     if (referenceList.Count > 0) {
                         foreach (var entry in referenceList) {
-                            clonedList.Add (entry);
+                            if (!clonedList.Contains (entry)) {
+                                clonedList.Add (entry);
+                            }
                         }
                     }
                     if (!clonedList.Contains (leftString)) {
                         clonedList.Add (leftString);
                     }
-                    mainList.Add (clonedList);
+                    if (!isMemberless) {
+                        if (!mainList.Contains (clonedList)) {
+                            mainList.Add (clonedList);
+                        }
+                    } else {
+                        if (!memberLessList.Contains (clonedList)) {
+                            memberLessList.Add (clonedList);
+                        }
+                    }
                     if (!referenceList.Contains (rightString)) {
                         referenceList.Add (rightString);
                     }
                 }
-                mainList.Add (referenceList);
-                return mainList;
+                if (!isMemberless) {
+                    if (!mainList.Contains (referenceList)) {
+                        mainList.Add (referenceList);
+                    }
+                    return mainList;
+                } else {
+                    if (!memberLessList.Contains (referenceList)) {
+                        memberLessList.Add (referenceList);
+                    }
+                    return memberLessList;
+                }
+            }
+
+            //TODO: In this situation it is reasonable to assume that both sides are OR statements, and the current node is an AND statement. We need to build a list for both sides, where both new lists are built from the existing reference list if it exists. 
+            //TODO: ?? find the side that has a member, if both, it doesnt matter which ?? -- new func? GetMemberSide?
+            //TODO: ?? Maybe for this edge case.. a new function is needed to walk the or statements? Or... why can't we just use the existing or logic? I'll re-explore this
+            if (!memberAccessMap["left"] && !memberAccessMap["right"]) {
+                BinaryExpression root;
+                BinaryExpression process;
+                ArrayList rootList = new ArrayList ();
+                ArrayList processList = new ArrayList ();
+                ArrayList primaryList = new ArrayList ();
+                ArrayList alternativeList = new ArrayList ();
+                if (referenceList.Count > 0) {
+                    foreach (var entry in referenceList) {
+                        if (!primaryList.Contains (entry)) {
+                            primaryList.Add (entry);
+
+                        }
+                        if (!alternativeList.Contains (entry)) {
+                            alternativeList.Add (entry);
+                        }
+                    }
+                }
+
+                var leftCheck = ChildHasMember (evalExpression.Left);
+                var rightCheck = ChildHasMember (evalExpression.Right);
+                var memberSide = leftCheck ? "left" : (rightCheck ? "right" : null);
+                if (memberSide == "left") {
+                    root = evalExpression.Left as BinaryExpression;
+                    process = evalExpression.Right as BinaryExpression;
+
+                } else if (memberSide == "right") {
+                    root = evalExpression.Right as BinaryExpression;
+                    process = evalExpression.Left as BinaryExpression;
+                } else {
+                    throw new Exception ("no memberside" + evalExpression.ToString ());
+                }
+                rootList = BuildList (root, ref primaryList, ref mainList, true);
+                if (rootList.Count > 1) {
+                    foreach (ArrayList list in rootList) {
+                        ArrayList innerList = new ArrayList (alternativeList);
+                        foreach (string entry in list) {
+                            // if (!alternativeList.Contains (entry)) {
+                            //     alternativeList.Add (entry);
+                            // }
+                            if (!innerList.Contains (entry)) {
+                                innerList.Add (entry);
+                            }
+                        }
+                        BuildList (process, ref innerList, ref mainList, true);
+                        // BuildList (process, ref alternativeList, ref mainList, true);
+                    }
+                } else {
+                    if (!alternativeList.Contains (rootList[0])) {
+                        alternativeList.Add (rootList[0]);
+                    }
+                    BuildList (process, ref alternativeList, ref mainList, true);
+                }
+
+                // try {
+                //     subList = BuildList (evalExpression.Left as BinaryExpression, ref rightClonedList, ref mainList);
+                //     foreach (ArrayList list in subList) {
+                //         ArrayList innerSubList = list;
+                //         int listIndex = subList.IndexOf (list);
+                //         BuildList (evalExpression.Left as BinaryExpression, ref innerSubList, ref mainList);
+                //     }
+                // } catch (System.Exception) { }
+                // try {
+                //     BuildList (evalExpression.Right as BinaryExpression, ref rightClonedList, ref mainList);
+                // } catch (System.Exception) { }
+
+                //throw new Exception ("no member/nonMember could be found...");
+                return null;
             }
 
             if (memberAccessMap["left"]) {
@@ -74,7 +172,7 @@ namespace StringOps {
                 member = evalExpression.Right as MemberExpression;
                 nonMember = evalExpression.Left;
             } else {
-                throw new Exception ("no member/nonMember could be found...");
+                throw new Exception ();
             }
             memberString = member.Expression.ToString ();
 
@@ -116,6 +214,7 @@ namespace StringOps {
                 // return BuildList (nonMember, ref referenceList, ref mainList);
                 try {
                     BuildList (nonMember, ref referenceList, ref mainList);
+
                 } catch (System.Exception) { }
             }
 
