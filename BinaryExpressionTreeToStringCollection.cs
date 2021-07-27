@@ -11,24 +11,8 @@ namespace StringOps {
         public BinaryExpressionTreeParser () { }
         public LambdaParser LambdaParser = new LambdaParser ();
 
-        public string LevelString (string inputString) {
-            var chars = inputString.ToCharArray ();
-            int leftOccurrences = Array.FindAll<char> (chars, x => x == '(').Count (); 
-            int rightOccurrences = Array.FindAll<char> (chars, x => x == ')').Count ();
-            if (leftOccurrences != rightOccurrences) {
-                if (leftOccurrences > rightOccurrences) {
-                    Debug.WriteLine("More Left");
-                    inputString = inputString + ")";
-                } else {
-                    Debug.WriteLine("More Right");
-                    inputString = "(" + inputString;
-                }
-            }
-            return inputString;
-        }
-
         public ArrayList ToStringCollection (string treeAsString) {
-            treeAsString = LevelString(treeAsString);
+            treeAsString = LevelString (treeAsString);
             BinaryExpression parsedExpression = LambdaParser.Parse (treeAsString) as BinaryExpression;
             return ToStringCollection (parsedExpression);
         }

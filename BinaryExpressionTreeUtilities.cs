@@ -1,11 +1,11 @@
 using System;
 using System.Collections;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 
-namespace StringOps
-{
+namespace StringOps {
     public class BinaryExpressionTreeUtilities {
         public string GetMemberSide (dynamic expression) {
             if (expression is BinaryExpression) {
@@ -40,7 +40,21 @@ namespace StringOps
 
             return memberSide;
         }
-
+        public string LevelString (string inputString) {
+            var chars = inputString.ToCharArray ();
+            int leftOccurrences = Array.FindAll<char> (chars, x => x == '(').Count ();
+            int rightOccurrences = Array.FindAll<char> (chars, x => x == ')').Count ();
+            if (leftOccurrences != rightOccurrences) {
+                if (leftOccurrences > rightOccurrences) {
+                    Debug.WriteLine ("More Left");
+                    inputString = inputString + ")";
+                } else {
+                    Debug.WriteLine ("More Right");
+                    inputString = "(" + inputString;
+                }
+            }
+            return inputString;
+        }
         public bool ChildHasMember (dynamic expression) {
             if (expression is BinaryExpression) {
                 return ChildHasMember (expression);
