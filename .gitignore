@@ -1,5 +1,10 @@
 *\scratch\*
 *\scratch
 *\.vscode
-*\obj\*
-*\bin\*
+obj
+bin
+./obj*/*
+*/bin
+/bin*/*
+/src/bin/*
+/src/bin
