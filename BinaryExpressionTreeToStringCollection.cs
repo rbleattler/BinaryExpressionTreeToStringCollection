@@ -6,20 +6,41 @@ using System.Linq.Expressions;
 using System.Runtime.InteropServices;
 using NReco.Linq;
 
-namespace StringOps {
+namespace TreeToString {
     public class BinaryExpressionTreeParser : BinaryExpressionTreeUtilities {
         public BinaryExpressionTreeParser () { }
         public LambdaParser LambdaParser = new LambdaParser ();
 
         public ArrayList ToStringCollection (string treeAsString) {
-            treeAsString = LevelString (treeAsString);
-            BinaryExpression parsedExpression = LambdaParser.Parse (treeAsString) as BinaryExpression;
+            WritePsVerbose ("[Enter ToStringCollection]");
+            BinaryExpression parsedExpression;
+            try {
+                treeAsString = LevelString (treeAsString);
+            } catch (System.Exception) {
+                throw new Exception ("[ToStringCollection] : Failed on LevelString");
+            }
+            try {
+                parsedExpression = LambdaParser.Parse (treeAsString) as BinaryExpression;
+            } catch (System.Exception) {
+                throw new Exception ("[ToStringCollection] : Failed on Parsing");
+            }
+            WritePsVerbose ("[Exit ToStringCollection]");
             return ToStringCollection (parsedExpression);
         }
         public ArrayList ToStringCollection (BinaryExpression treeExpression) {
+            WritePsVerbose ("[Enter ToStringCollection]");
             ArrayList outerList = new ArrayList ();
             ArrayList referenceList = new ArrayList ();
-            BuildList (treeExpression, ref referenceList, ref outerList);
+            // try {
+            var buildList = BuildList (treeExpression, ref referenceList, ref outerList);
+            // } catch (System.Exception ex) {
+            //     throw new Exception ("Failed on BuildList");
+            // }
+            if (outerList.Count == 0) {
+                WritePsVerbose ("[Exit ToStringCollection]");
+                return buildList;
+            }
+            WritePsVerbose ("[Exit ToStringCollection]");
             return outerList;
         }
 
