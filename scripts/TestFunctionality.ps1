@@ -1,5 +1,6 @@
 Set-Location "$PSScriptRoot\.."
 # $DebugPreference = "Continue"
+$Host.PrivateData.WarningForegroundColor = [System.ConsoleColor]::DarkRed
 $Here = $PSScriptRoot
 Add-Type -Path @(
     #Idk why it doesn't load for me... if this causes issues, just comment it out
@@ -37,6 +38,8 @@ $($Strings.Keys | Sort-Object).ForEach{
         Write-Warning "FAIL"
         Write-Warning $OutText
         $null = $BadStrings.Add($ThisVar)
+        $Out = $null
+        $OutText = "Errored"
     }
     $Host.UI.WriteLine([System.ConsoleColor]::Green, $Host.UI.RawUI.BackgroundColor, $OutText)
     $Out.ForEach{
