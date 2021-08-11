@@ -39,6 +39,41 @@ namespace TreeToString {
             }
             WritePsVerbose ("[Exit AddToList]");
         }
+        public void AddToList (dynamic item, ref List<dynamic> list) {
+            WritePsVerbose ("[Enter AddToList]");
+            if (!list.Contains (item)) {
+                WritePsDebug ("[AddToList] : Item Added");
+                list.Add (item);
+            } else {
+                WritePsDebug ("[AddToList] : Item Already In List");
+            }
+            WritePsVerbose ("[Exit AddToList]");
+        }
+
+        public void AddToList (dynamic[] item, ref ArrayList list) {
+            WritePsVerbose ("[Enter AddToList]");
+            foreach (var innerItem in item) {
+                if (!list.Contains (innerItem)) {
+                    WritePsDebug ("[AddToList] : Item Added");
+                    list.Add (innerItem);
+                } else {
+                    WritePsDebug ("[AddToList] : Item Already In List");
+                }
+            }
+            WritePsVerbose ("[Exit AddToList]");
+        }
+        public void AddToList (dynamic[] item, ref List<dynamic> list) {
+            WritePsVerbose ("[Enter AddToList]");
+            foreach (var innerItem in item) {
+                if (!list.Contains (innerItem)) {
+                    WritePsDebug ("[AddToList] : Item Added");
+                    list.Add (innerItem);
+                } else {
+                    WritePsDebug ("[AddToList] : Item Already In List");
+                }
+            }
+            WritePsVerbose ("[Exit AddToList]");
+        }
 
         public dynamic ProcessNode (dynamic node) {
             ArrayList primaryList = new ArrayList ();
@@ -145,14 +180,6 @@ namespace TreeToString {
             //     // }
             // }
             // WritePsDebug ("Exiting ProcessNode...");
-            return null;
-        }
-
-        public ArrayList MergeEBT (BinaryExpression mergeItem) {
-            return MergeEBT (new EnhancedBinaryExpression (mergeItem));
-        }
-
-        public ArrayList MergeEBT (EnhancedBinaryExpression mergeItem) {
             return null;
         }
 
@@ -394,7 +421,7 @@ namespace TreeToString {
                     outList = AndMerge (leftObject, rightObject, rightExpressionType);
                 } catch (System.Exception ex) {
                     WritePsVerbose ("ERROR CALLING WITH RIGHTEXPRESSIONTYPE : " + ex.Message);
-                    
+
                     outList = AndMerge (leftObject, rightObject);
                 }
                 WritePsVerbose ("[Exit Merge]");
