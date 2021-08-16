@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Management;
 using System.Management.Automation;
@@ -89,7 +90,29 @@ namespace TreeToString {
             );
             return JsonObject.ConvertToJson (objectToProcess, context);
         }
+        public void RemovePsVariable (string varName) {
+            RemovePsVariable (varName, "GLOBAL");
+        }
 
+        public void RemovePsVariable (string varName, string scope) {
+            string[] strings = {
+                "GLOBAL",
+                "LOCAL",
+                "SCRIPT",
+                "PRIVATE",
+                "USING",
+                "WORKFLOW"
+            };
+            Contract.Requires (
+                strings.Contains (scope.ToUpper ())
+            );
+            var psRunspace = PowerShell.Create (RunspaceMode.CurrentRunspace);
+            psRunspace.AddCommand ("Remove-Variable");
+            psRunspace.AddParameter ("Name", varName);
+            psRunspace.AddParameter ("Scope", scope);
+            psRunspace.AddParameter ("Force", true);
+            psRunspace.Invoke ();
+        }
         public dynamic GetPsVariable (string varName) {
             return GetPsVariable (varName, true);
         }
@@ -127,6 +150,7 @@ namespace TreeToString {
             try {
                 var rawObject = GetPsVariable ("NewObject");
                 psVar = ConvertToJson (rawObject);
+                RemovePsVariable ("NewObject");
             } catch (System.Exception ex) {
                 throw new Exception ("Couldn't Serialize NewObject...", ex);
             }
@@ -151,7 +175,7 @@ namespace TreeToString {
         public void WritePsVerbose (string message) {
             var psRunspace = PowerShell.Create (RunspaceMode.CurrentRunspace);
             UpdatePsOutputPreferences ();
-            string currentSetting = OutputPreferences.DebugPreference;
+            string currentSetting = OutputPreferences.VerbosePreference;
             if (this.toHostSettings.Contains (currentSetting)) {
                 psRunspace.AddCommand ("Write-Verbose");
                 psRunspace.AddParameter ("Message", message);
@@ -161,7 +185,7 @@ namespace TreeToString {
         public void WritePsError (ErrorRecord errorRecord) {
             var psRunspace = PowerShell.Create (RunspaceMode.CurrentRunspace);
             UpdatePsOutputPreferences ();
-            string currentSetting = OutputPreferences.DebugPreference;
+            string currentSetting = OutputPreferences.ErrorActionPreference;
             if (this.toHostSettings.Contains (currentSetting)) {
                 psRunspace.AddCommand ("Write-Error");
                 psRunspace.AddParameter ("ErrorRecord", errorRecord);
@@ -171,7 +195,7 @@ namespace TreeToString {
         public void WritePsError (string message) {
             var psRunspace = PowerShell.Create (RunspaceMode.CurrentRunspace);
             UpdatePsOutputPreferences ();
-            string currentSetting = OutputPreferences.DebugPreference;
+            string currentSetting = OutputPreferences.ErrorActionPreference;
             if (this.toHostSettings.Contains (currentSetting)) {
                 psRunspace.AddCommand ("Write-Error");
                 psRunspace.AddParameter ("Message", message);
