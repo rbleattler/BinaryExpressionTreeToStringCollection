@@ -16,54 +16,10 @@ using Microsoft.PowerShell.Commands.Utility;
 using Microsoft.VisualBasic;
 using Newtonsoft.Json;
 
-namespace TreeToString {
+namespace TreeToString.PowerShellExtensions {
 
-    public class PSOutputPreferences {
-        public string ConfirmPreference;
-        public string DebugPreference;
-        public string ErrorActionPreference;
-        public string InformationPreference;
-        public string ProgressPreference;
-        public string VerbosePreference;
-        public string WarningPreference;
-        public string WhatIfPreference;
-
-        public PSOutputPreferences () { }
-
-        public PSOutputPreferences (dynamic inputObject) {
-            inputObject = inputObject as Dictionary<string, string>;
-            this.ConfirmPreference = inputObject["ConfirmPreference"];
-            this.DebugPreference = inputObject["DebugPreference"];
-            this.ErrorActionPreference = inputObject["ErrorActionPreference"];
-            this.InformationPreference = inputObject["InformationPreference"];
-            this.ProgressPreference = inputObject["ProgressPreference"];
-            this.VerbosePreference = inputObject["VerbosePreference"];
-            this.WarningPreference = inputObject["WarningPreference"];
-            this.WhatIfPreference = inputObject["WhatIfPreference"];
-        }
-        public PSOutputPreferences (Dictionary<string, string> inputObject) {
-            this.ConfirmPreference = inputObject["ConfirmPreference"];
-            this.DebugPreference = inputObject["DebugPreference"];
-            this.ErrorActionPreference = inputObject["ErrorActionPreference"];
-            this.InformationPreference = inputObject["InformationPreference"];
-            this.ProgressPreference = inputObject["ProgressPreference"];
-            this.VerbosePreference = inputObject["VerbosePreference"];
-            this.WarningPreference = inputObject["WarningPreference"];
-            this.WhatIfPreference = inputObject["WhatIfPreference"];
-        }
-        public PSOutputPreferences (string confirmPreference, string debugPreference, string errorActionPreference, string informationPreference, string progressPreference, string verbosePreference, string warningPreference, string whatIfPreference) {
-            this.ConfirmPreference = confirmPreference;
-            this.DebugPreference = debugPreference;
-            this.ErrorActionPreference = errorActionPreference;
-            this.InformationPreference = informationPreference;
-            this.ProgressPreference = progressPreference;
-            this.VerbosePreference = verbosePreference;
-            this.WarningPreference = warningPreference;
-            this.WhatIfPreference = whatIfPreference;
-        }
-    }
-
-    public class PowerShellLogging {
+    public class PowerShellLogging : IPowerShellVariables {
+        private PowerShellVariables PowerShellVariables = new PowerShellVariables ();
         public PSOutputPreferences OutputPreferences = new PSOutputPreferences ();
         private List<string> outputSettings = new List<string> {
             "Break",
@@ -90,49 +46,7 @@ namespace TreeToString {
             );
             return JsonObject.ConvertToJson (objectToProcess, context);
         }
-        public void RemovePsVariable (string varName) {
-            RemovePsVariable (varName, "GLOBAL");
-        }
 
-        public void RemovePsVariable (string varName, string scope) {
-            string[] strings = {
-                "GLOBAL",
-                "LOCAL",
-                "SCRIPT",
-                "PRIVATE",
-                "USING",
-                "WORKFLOW"
-            };
-            Contract.Requires (
-                strings.Contains (scope.ToUpper ())
-            );
-            var psRunspace = PowerShell.Create (RunspaceMode.CurrentRunspace);
-            psRunspace.AddCommand ("Remove-Variable");
-            psRunspace.AddParameter ("Name", varName);
-            psRunspace.AddParameter ("Scope", scope);
-            psRunspace.AddParameter ("Force", true);
-            psRunspace.Invoke ();
-        }
-        public dynamic GetPsVariable (string varName) {
-            return GetPsVariable (varName, true);
-        }
-        public dynamic GetPsVariable (string varName, bool valueOnly) {
-            var psRunspace = PowerShell.Create (RunspaceMode.CurrentRunspace);
-            psRunspace.AddCommand ("Get-Variable");
-            psRunspace.AddParameter ("Name", varName);
-            if (valueOnly) {
-                psRunspace.AddParameter ("ValueOnly", true);
-            }
-            var outVar = psRunspace.Invoke ();
-            return outVar;
-        }
-        public void SetPsVariable (string varName, dynamic varValue) {
-            var psRunspace = PowerShell.Create (RunspaceMode.CurrentRunspace);
-            psRunspace.AddCommand ("Set-Variable");
-            psRunspace.AddParameter ("Name", varName);
-            psRunspace.AddParameter ("Value", varValue);
-            psRunspace.Invoke ();
-        }
         public void UpdatePsOutputPreferences () {
             var psRunspace = PowerShell.Create (RunspaceMode.CurrentRunspace);
             ScriptBlock scriptBlock = ScriptBlock.Create ("$Global:NewObject = [System.Collections.Generic.Dictionary[[string],[string]]]::new(); (Get-Variable *Preference).ForEach{ $NewObject.Add($PSItem.Name, $PSItem.Value)}");
@@ -155,13 +69,12 @@ namespace TreeToString {
                 throw new Exception ("Couldn't Serialize NewObject...", ex);
             }
             try {
-                //FIXME: This is dumb... why is it a list? Why do I have to do this? WHYYYY!?
+                //FIXME: This is dumb... why is it a list? Why do I have to do this? WHY!?
                 OutputPreferences = JsonConvert.DeserializeObject<List<PSOutputPreferences>> (psVar) [0];
             } catch (System.Exception ex) {
                 throw new Exception ("Couldn't Set PSOutputPreferences...", ex);
             }
         }
-
         public void WritePsDebug (string message) {
             var psRunspace = PowerShell.Create (RunspaceMode.CurrentRunspace);
             UpdatePsOutputPreferences ();
@@ -203,5 +116,32 @@ namespace TreeToString {
             }
         }
 
+        public dynamic GetPsVariable (string varName) {
+            return PowerShellVariables.GetPsVariable (varName, true);
+        }
+
+        public dynamic GetPsVariable (string varName, bool valueOnly) {
+            return PowerShellVariables.GetPsVariable (varName, valueOnly);
+        }
+
+        public void RemovePsVariable (string varName) {
+            PowerShellVariables.RemovePsVariable (varName);
+        }
+
+        public void RemovePsVariable (string varName, string scope) {
+            PowerShellVariables.RemovePsVariable (varName, scope);
+        }
+
+        public void SetPsVariable (string varName, dynamic varValue) {
+            PowerShellVariables.SetPsVariable (varName, varValue);
+        }
+
+        public dynamic GetPsVariable (string varName, bool valueOnly, string scope) {
+            return PowerShellVariables.GetPsVariable (varName, valueOnly, scope);
+        }
+
+        public void SetPsVariable (string varName, dynamic varValue, string scope) {
+            PowerShellVariables.SetPsVariable (varName, varValue, scope);
+        }
     }
 }
