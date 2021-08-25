@@ -8,6 +8,7 @@ using System.Management;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using TreeToString;
+using TreeToString.PowerShellExtensions;
 
 namespace TreeToString {
 
@@ -286,7 +287,7 @@ namespace TreeToString {
             WritePsVerbose ("[Exit AndMerge]");
             return mainList;
         }
-        //TODO: Maybe make all of these use the one with the processMergeType?
+        //TODO: Maybe make all of these use the one with the process MergeType?
         public ArrayList AndMerge (ArrayList rootList, ArrayList processList, ExpressionType processMergeType) {
             WritePsVerbose ("[Enter AndMerge (ArrayList, ArrayList, ExpressionType)]");
             ArrayList mainList = new ArrayList ();

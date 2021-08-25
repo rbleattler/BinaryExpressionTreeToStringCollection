@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Linq.Expressions;
+using NReco.Linq;
 using TreeToString;
 using TreeToString.PowerShellExtensions;
 
@@ -12,6 +13,7 @@ namespace TreeToString.ExtendedBinaryExpression {
         public BinaryExpression ParentNode;
         public Expression Node;
         public ExpressionType NodeType;
+        public ParsedNode ParsedNode = new ParsedNode ();
         public ParsedNode ParsedLeftNode = new ParsedNode ();
         public ParsedNode ParsedRightNode = new ParsedNode ();
 
@@ -28,6 +30,13 @@ namespace TreeToString.ExtendedBinaryExpression {
             // TODO: Assume that if a ParentNode is not provided this is the *topmost* node. 
         }
         public ExtendedBinaryExpression (Expression fromExpression) {
+            if (fromExpression.NodeType == ExpressionType.Parameter) {
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::Parse]::ConvertParameterExpressionToBinaryExpression");
+                string newString = String.Format ("{0} || {0}", (fromExpression as ParameterExpression).Name);
+                // This will generate a Binary Expression... when the expression being presented is a single entry...
+                fromExpression = new LambdaParser ().Parse (newString);
+            }
+
             this.Node = fromExpression;
             this.NodeType = fromExpression.NodeType;
             // TODO: Assume that if a ParentNode is not provided this is the *topmost* node. 
@@ -44,7 +53,8 @@ namespace TreeToString.ExtendedBinaryExpression {
 
         public ParsedNode ToParsedNode () {
             ExtendedBinaryExpression thisNode = new ExtendedBinaryExpression (this.Node);
-            return ExpressionParser.Parse (thisNode);
+            this.ParsedNode = ExpressionParser.Parse (thisNode);
+            return this.ParsedNode;
         }
     }
 }

@@ -1,250 +1,359 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
+using NReco.Linq;
 using TreeToString;
 using TreeToString.PowerShellExtensions;
 
 namespace TreeToString.ExtendedBinaryExpression {
     public class ExtendedBinaryExpressionParser {
         private PowerShellLogging PSLogger = new PowerShellLogging ();
+        public LambdaParser LambdaParser = new LambdaParser ();
+        public string LevelString (string inputString) {
+            var chars = inputString.ToCharArray ();
+            int leftOccurrences = Array.FindAll<char> (chars, x => x == '(').Count ();
+            int rightOccurrences = Array.FindAll<char> (chars, x => x == ')').Count ();
+            if (leftOccurrences != rightOccurrences) {
+                if (leftOccurrences > rightOccurrences) {
+                    PSLogger.WritePsDebug ("More Left");
+                    inputString = inputString + ")";
+                } else {
+                    PSLogger.WritePsDebug ("More Right");
+                    inputString = "(" + inputString;
+                }
+            }
+            return inputString;
+        }
         public ParsedNode Parse (BinaryExpression inputExpression) {
             ExtendedBinaryExpression extendedExpression = new ExtendedBinaryExpression (inputExpression);
             return Parse (extendedExpression);
         }
+
+        public List<dynamic> ToStringEntries (ParsedNode parsedNode, ExpressionType expressionType) {
+            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ToStringEntries]::Begin");
+
+            if (expressionType == ExpressionType.AndAlso) {
+                if (
+                    (parsedNode.RawExpression.ParsedLeftNode.NodeType == ExpressionType.MemberAccess) &&
+                    (parsedNode.RawExpression.ParsedRightNode.NodeType == ExpressionType.MemberAccess)
+                ) {
+                    string stringEntry = String.Format ("{0}, {1}", parsedNode.Entries[0], parsedNode.Entries[1]);
+                    parsedNode.StringEntries.Add (stringEntry);
+                }
+                // TODO: LeftMa & RightAnd
+                // TODO: LeftMa & RightOr
+                // TODO: RightMa & LeftAnd
+                // TODO: RightMa & LeftOr
+            }
+            if (expressionType == ExpressionType.OrElse) {
+                // TODO: LeftMa & RightMa
+                // TODO: LeftMa & RightAnd
+                // TODO: LeftMa & RightOr
+                // TODO: RightMa & LeftAnd
+                // TODO: RightMa & LeftOr
+            }
+
+            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ToStringEntries]::End");
+            return parsedNode.StringEntries;
+        }
+
         public ParsedNode Parse (Expression inputExpression) {
+            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::Parse]::Begin");
+            if (inputExpression.NodeType == ExpressionType.Parameter) {
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::Parse]::ConvertParameterExpressionToBinaryExpression");
+                string newString = String.Format ("{0} || {0}", (inputExpression as ParameterExpression).Name);
+                // This will generate a Binary Expression... when the expression being presented is a single entry...
+                inputExpression = new LambdaParser ().Parse (newString);
+            }
             ExtendedBinaryExpression extendedExpression = new ExtendedBinaryExpression (inputExpression);
+            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::Parse]::End");
             return Parse (extendedExpression);
         }
 
         private ParsedNode ParseAnd (ExtendedBinaryExpression inputExpression) {
             PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::InputExpression.NodeType == AndAlso");
-            ParsedNode parsedNode = new ParsedNode (inputExpression.NodeType);
+            ParsedNode parsedNode = new ParsedNode (inputExpression, inputExpression.NodeType);
             ExpressionType leftType = inputExpression.ParsedLeftNode.NodeType;
             ExpressionType rightType = inputExpression.ParsedRightNode.NodeType;
             bool isLeftMemberAccess = leftType == ExpressionType.MemberAccess;
             bool isRightMemberAccess = rightType == ExpressionType.MemberAccess;
-            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::LeftType == " + leftType);
-            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::RightType == " + rightType);
-            // If both left and right nodes are MemberAccess types, add them both to the entries list. Return;
+            ParsedNode primaryParsedNode = null;
+            ParsedNode secondaryParsedNode = null;
+            ExpressionType primaryType = ExpressionType.Negate; // can't be null
+            ExpressionType secondaryType = ExpressionType.Negate; // can't be null
+
+            // If both Primary and Secondary Nodes are MemberAccess types, add them both to the entries list. Return;
             if (isLeftMemberAccess && isRightMemberAccess) {
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::BothMemberAccess");
                 parsedNode.AddEntry (inputExpression.ParsedLeftNode.Entries);
                 parsedNode.AddEntry (inputExpression.ParsedRightNode.Entries);
                 PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::End");
                 return parsedNode;
             } else {
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::NotBothMemberAccess");
                 if (isLeftMemberAccess && (!isRightMemberAccess)) {
-                    //TODO: Left is Primary
-                    //TODO: Right is Secondary
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::LeftIsMemberAccess");
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::LeftIsPrimary");
+                    // Left is Primary
+                    // Right is Secondary
+                    primaryParsedNode = inputExpression.ParsedLeftNode;
+                    secondaryParsedNode = inputExpression.ParsedRightNode;
+                    primaryType = leftType;
+                    secondaryType = rightType;
                 }
                 if (isRightMemberAccess && (!isLeftMemberAccess)) {
-                    //TODO: Right is Primary
-                    //TODO: Left is Secondary
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::RightIsMemberAccess");
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::RightIsPrimary");
+                    // Right is Primary
+                    // Left is Secondary
+                    primaryParsedNode = inputExpression.ParsedRightNode;
+                    secondaryParsedNode = inputExpression.ParsedLeftNode;
+                    primaryType = rightType;
+                    secondaryType = leftType;
+                }
+                if ((!isLeftMemberAccess) && (!isRightMemberAccess)) {
+                    primaryParsedNode = inputExpression.ParsedLeftNode;
+                    secondaryParsedNode = inputExpression.ParsedRightNode;
+                    primaryType = leftType;
+                    secondaryType = rightType;
                 }
             }
+            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::PrimaryType == " + primaryType);
+            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryType == " + secondaryType);
 
-            // If the left node is MemberAccess Type...
-            if (isLeftMemberAccess) {
-                // and the Right Node is an AND node...
-                if (rightType == ExpressionType.AndAlso) {
-                    parsedNode.AddEntry (inputExpression.ParsedLeftNode.Entries);
-                    foreach (var entry in inputExpression.ParsedRightNode.Entries) {
-                        parsedNode.AddEntry (entry);
+            // If the Primary Node is MemberAccess Type...
+            if (primaryType == ExpressionType.MemberAccess) {
+                // and the Secondary Node is an AND node...
+                if (secondaryType == ExpressionType.AndAlso) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsAndAlso");
+                    parsedNode.AddEntry (primaryParsedNode.Entries);
+                    foreach (var secondaryEntry in secondaryParsedNode.Entries) {
+                        parsedNode.AddEntry (secondaryEntry);
                     }
                     PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::End");
                     return parsedNode;
                 }
-                // and the Right Node is an OR node...
-                if (rightType == ExpressionType.OrElse) {
+                // and the Secondary Node is an OR node...
+                if (secondaryType == ExpressionType.OrElse) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsOrElse");
                     // The desired effect here is that a list of possible combinations will be added to the entries list of the parsing node, 
-                    // so if the left node is a MemberAccess node whose Expression.Name is LeftNode0 and the right node is an OrElse node which 
+                    // so if the Primary Node is a MemberAccess node whose Expression.Name is PrimaryNode0 and the Secondary Node is an OrElse node which 
                     // contains two MemberAccess nodes RightNode0 and RightNode1, a nested list like the one below should be assigned to the parsing 
                     // node's Entries field. NOTE: The names in the representation below are meant to represent their respective objects.
                     // {
-                    //  {RightNode0, LeftNode0}
-                    //  {RightNode1, LeftNode0}
+                    //  {RightNode0, PrimaryNode0}
+                    //  {RightNode1, PrimaryNode0}
                     // }
-                    foreach (var rightEntry in inputExpression.ParsedRightNode.Entries) {
+                    foreach (var secondaryEntry in secondaryParsedNode.Entries) {
                         List<object> newList = new List<object> ();
-                        newList.Add (rightEntry);
-                        foreach (var leftEntry in inputExpression.ParsedLeftNode.Entries) {
-                            newList.Add (leftEntry);
+                        newList.Add (secondaryEntry);
+                        foreach (var primaryEntry in primaryParsedNode.Entries) {
+                            newList.Add (primaryEntry);
                         }
                         parsedNode.AddEntry (newList);
                     }
                     PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::End");
                     return parsedNode;
                 }
-            } else {
-                // If the left node is NOT MemberAccess Type...
-                //@ Since the right should never be of type MemberAccess when the left is NOT, we'll throw an error if that happens for now
-                if (rightType == ExpressionType.MemberAccess) {
+            }
+
+            if (primaryType == ExpressionType.AndAlso) {
+                // If the Primary Node is an AND node...
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::PrimaryIsAndAlso");
+                // And the Secondary Node is also an AND node... Since the Top Level Node is an AND node, we just concatenate the lists... 
+                if (secondaryType == ExpressionType.AndAlso) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsAndAlso");
+                    foreach (var primaryEntry in primaryParsedNode.Entries) {
+                        parsedNode.AddEntry (primaryEntry);
+                    }
+                    foreach (var secondaryEntry in secondaryParsedNode.Entries) {
+                        parsedNode.AddEntry (secondaryEntry);
+                    }
                     PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::End");
-                    throw new Exception ("Right member type was MemberAccess when Left Type was not. Handler not implemented.");
+                    return parsedNode;
+
                 }
-
-                if (leftType == ExpressionType.AndAlso) {
-                    // If the left node is an AND node... 
-                    // And the right node is also an AND node... Since the Top Level Node is an AND node, we just concatenate the lists... 
-                    if (rightType == ExpressionType.AndAlso) {
-                        foreach (var entry in inputExpression.ParsedLeftNode.Entries) {
-                            parsedNode.AddEntry (entry);
-                        }
-                        foreach (var entry in inputExpression.ParsedRightNode.Entries) {
-                            parsedNode.AddEntry (entry);
-                        }
-                        PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::End");
-                        return parsedNode;
-
+                // If the Primary Node is an AND node... Since the Top Level Node is an AND node, we just concatenate the lists... 
+                if (secondaryType == ExpressionType.OrElse) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsOrElse");
+                    List<object> basePrimaryList = new List<object> ();
+                    foreach (var primaryEntry in primaryParsedNode.Entries) {
+                        basePrimaryList.Add (primaryEntry);
                     }
-                    // If the left node is an AND node... Since the Top Level Node is an AND node, we just concatenate the lists... 
-                    if (rightType == ExpressionType.OrElse) {
-                        List<object> baseLeftList = new List<object> ();
-                        foreach (var leftEntry in inputExpression.ParsedLeftNode.Entries) {
-                            baseLeftList.Add (leftEntry);
-                        }
-                        foreach (var rightEntry in inputExpression.ParsedRightNode.Entries) {
-                            List<object> newList = new List<object> (baseLeftList);
-                            newList.Add (rightEntry);
-                            parsedNode.AddEntry (newList);
-                        }
-                        return parsedNode;
+                    foreach (var secondaryEntry in secondaryParsedNode.Entries) {
+                        List<object> newList = new List<object> (basePrimaryList);
+                        newList.Add (secondaryEntry);
+                        parsedNode.AddEntry (newList);
                     }
-                }
-                if (leftType == ExpressionType.OrElse) {
-                    // If the left node is an OR node...
-
-                    // And the right node is an AND node... Since the Top Level Node is an AND node, we just concatenate the lists... 
-                    if (rightType == ExpressionType.AndAlso) {
-                        List<object> baseRightList = new List<object> ();
-                        foreach (var rightEntry in inputExpression.ParsedRightNode.Entries) {
-                            baseRightList.Add (rightEntry);
-                        }
-                        foreach (var leftEntry in inputExpression.ParsedLeftNode.Entries) {
-                            List<object> newList = new List<object> (baseRightList);
-                            newList.Add (leftEntry);
-                            parsedNode.AddEntry (newList);
-                        }
-                        PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::End");
-                        return parsedNode;
-                    }
-                    if (rightType == ExpressionType.OrElse) {
-                        foreach (var leftEntry in inputExpression.ParsedLeftNode.Entries) {
-                            foreach (var rightEntry in inputExpression.ParsedRightNode.Entries) {
-                                List<object> leftOutList = new List<object> ();
-                                leftOutList.Add (leftEntry);
-                                leftOutList.Add (rightEntry);
-                                parsedNode.AddEntry (leftOutList);
-                            }
-                        }
-                        PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::End");
-                        return parsedNode;
-                    }
+                    return parsedNode;
                 }
             }
+            if (primaryType == ExpressionType.OrElse) {
+                // If the Primary Node is an OR node...
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::PrimaryIsOrElse");
+                // And the Secondary Node is an AND node... Since the Top Level Node is an AND node, we just concatenate the lists... 
+                if (secondaryType == ExpressionType.AndAlso) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsAndAlso");
+                    List<object> baseRightList = new List<object> ();
+                    foreach (var secondaryEntry in secondaryParsedNode.Entries) {
+                        baseRightList.Add (secondaryEntry);
+                    }
+                    foreach (var primaryEntry in primaryParsedNode.Entries) {
+                        List<object> newList = new List<object> (baseRightList);
+                        newList.Add (primaryEntry);
+                        parsedNode.AddEntry (newList);
+                    }
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::End");
+                    return parsedNode;
+                }
+                if (secondaryType == ExpressionType.OrElse) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsOrElse");
+                    foreach (var primaryEntry in primaryParsedNode.Entries) {
+                        foreach (var secondaryEntry in secondaryParsedNode.Entries) {
+                            List<object> primaryOutList = new List<object> ();
+                            primaryOutList.Add (primaryEntry);
+                            primaryOutList.Add (secondaryEntry);
+                            parsedNode.AddEntry (primaryOutList);
+                        }
+                    }
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::End");
+                    return parsedNode;
+                }
+            }
+
+            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::ReachedUnexpectedEnd");
             PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::End");
             return parsedNode;
         }
 
         private ParsedNode ParseOr (ExtendedBinaryExpression inputExpression) {
             PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::InputExpression.NodeType == OrElse");
-            ParsedNode parsedNode = new ParsedNode (inputExpression.NodeType);
+            ParsedNode parsedNode = new ParsedNode (inputExpression, inputExpression.NodeType);
             ExpressionType leftType = inputExpression.ParsedLeftNode.NodeType;
             ExpressionType rightType = inputExpression.ParsedRightNode.NodeType;
             bool isLeftMemberAccess = leftType == ExpressionType.MemberAccess;
             bool isRightMemberAccess = rightType == ExpressionType.MemberAccess;
-            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::LeftType == " + leftType);
-            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::RightType == " + rightType);
-            // If both left and right nodes are MemberAccess types, add them both to the entries list. Return;
+            ParsedNode primaryParsedNode = null;
+            ParsedNode secondaryParsedNode = null;
+            ExpressionType primaryType = ExpressionType.Negate; // can't be null
+            ExpressionType secondaryType = ExpressionType.Negate; // can't be null
+
+            // If both Primary and Secondary Nodes are MemberAccess types, add them both to the entries list. Return;
             if (isLeftMemberAccess && isRightMemberAccess) {
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::BothMemberAccess");
                 parsedNode.AddEntry (inputExpression.ParsedLeftNode.Entries);
                 parsedNode.AddEntry (inputExpression.ParsedRightNode.Entries);
-                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::End");
                 return parsedNode;
             } else {
                 if (isLeftMemberAccess && (!isRightMemberAccess)) {
-                    //TODO: Left is Primary
-                    //TODO: Right is Secondary
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::LeftIsMemberAccess");
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::LeftIsPrimary");
+                    // Left is Primary
+                    // Right is Secondary
+                    primaryParsedNode = inputExpression.ParsedLeftNode;
+                    secondaryParsedNode = inputExpression.ParsedRightNode;
+                    primaryType = leftType;
+                    secondaryType = rightType;
                 }
                 if (isRightMemberAccess && (!isLeftMemberAccess)) {
-                    //TODO: Right is Primary
-                    //TODO: Left is Secondary
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::RightIsMemberAccess");
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::RightIsPrimary");
+                    // Right is Primary
+                    // Left is Secondary
+                    primaryParsedNode = inputExpression.ParsedRightNode;
+                    secondaryParsedNode = inputExpression.ParsedLeftNode;
+                    primaryType = rightType;
+                    secondaryType = leftType;
                 }
+                if ((!isLeftMemberAccess) && (!isRightMemberAccess)) {
+                    primaryParsedNode = inputExpression.ParsedLeftNode;
+                    secondaryParsedNode = inputExpression.ParsedRightNode;
+                    primaryType = leftType;
+                    secondaryType = rightType;
+                }
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::FinishedFindingMemberAccessTypes");
             }
+            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::PrimaryType == " + primaryType);
+            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryType == " + secondaryType);
 
-            // If the left node is MemberAccess Type...
-            if (isLeftMemberAccess) {
-                // and the Right Node is an AND node...
-                if (rightType == ExpressionType.AndAlso) {
-                    // Add the Left Entries (singular in this case), as well as the object that contains the Right Entries, because this should result in a list containing [0] the sole Left Entry, and [1] a list of the Right Entries 
-                    parsedNode.AddEntry (inputExpression.ParsedLeftNode.Entries);
-                    parsedNode.AddEntry (inputExpression.ParsedRightNode.Entries);
+            // If the Primary Node is MemberAccess Type...
+            if (primaryType == ExpressionType.MemberAccess) {
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::PrimaryIsMemberAccess");
+                // and the Secondary Node is an AND node...
+                if (secondaryType == ExpressionType.AndAlso) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsAndAlso");
+                    // Add the primary entries (singular in this case), as well as the object that contains the secondary entries, because this should result in a list containing [0] the sole primary entry, and [1] a list of the secondary entries 
+                    parsedNode.AddEntry (primaryParsedNode.Entries);
+                    parsedNode.AddEntry (secondaryParsedNode.Entries);
                     PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
                     return parsedNode;
                 }
-                // and the Right Node is an OR node...
-                if (rightType == ExpressionType.OrElse) {
-                    // Add the Left Entries (singular in this case), and each of the individual Right Entries, concatenating the lists as this is one extended OR statement
-                    parsedNode.AddEntry (inputExpression.ParsedLeftNode.Entries);
-                    foreach (var rightEntry in inputExpression.ParsedRightNode.Entries) {
-                        parsedNode.AddEntry (rightEntry);
+                // and the Secondary Node is an OR node...
+                if (secondaryType == ExpressionType.OrElse) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsOrElse");
+                    // Add the primary entries (singular in this case), and each of the individual secondary entries, concatenating the lists as this is one extended OR statement
+                    parsedNode.AddEntry (primaryParsedNode.Entries);
+                    foreach (var secondaryEntry in secondaryParsedNode.Entries) {
+                        parsedNode.AddEntry (secondaryEntry);
                     }
                     PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
                     return parsedNode;
                 }
-            } else {
-                // If the left node is NOT MemberAccess Type...
-                //@ Since the right should never be of type MemberAccess when the left is NOT, we'll throw an error if that happens for now
-                if (rightType == ExpressionType.MemberAccess) {
+                // If the Primary Node is NOT MemberAccess Type...
+            }
+            if (primaryType == ExpressionType.AndAlso) {
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::PrimaryIsAndAlso");
+                // If the Primary Node is an AND node... 
+                // And the Secondary Node is also an AND node... Since the Top Level Node is an OR node, we just add both lists of entries to the list... 
+                if (secondaryType == ExpressionType.AndAlso) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsAndAlso");
+                    parsedNode.AddEntry (primaryParsedNode.Entries);
+                    parsedNode.AddEntry (secondaryParsedNode.Entries);
                     PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
-                    throw new Exception ("Right member type was MemberAccess when Left Type was not. Handler not implemented.");
+                    return parsedNode;
                 }
 
-                if (leftType == ExpressionType.AndAlso) {
-                    // If the left node is an AND node... 
-                    // And the right node is also an AND node... Since the Top Level Node is an OR node, we just add both lists of entries to the list... 
-                    if (rightType == ExpressionType.AndAlso) {
-                        parsedNode.AddEntry (inputExpression.ParsedLeftNode.Entries);
-                        parsedNode.AddEntry (inputExpression.ParsedRightNode.Entries);
-                        PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
-                        return parsedNode;
+                // And the Secondary Node is an Or node... add the primary AND node to the parsed node, as this is a single entry, and add each node in the secondary OR node to the parsed node as each entry will be a distint possibility
+                if (secondaryType == ExpressionType.OrElse) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsOrElse");
+                    parsedNode.AddEntry (primaryParsedNode.Entries);
+                    foreach (var secondaryEntry in secondaryParsedNode.Entries) {
+                        parsedNode.AddEntry (secondaryEntry);
                     }
-
-                    // And the right node is an Or node... add the left AND node to the parsed node, as this is a single entry, and add each node in the right OR node to the parsed node as each entry will be a distint possibility
-                    if (rightType == ExpressionType.OrElse) {
-                        parsedNode.AddEntry (inputExpression.ParsedLeftNode.Entries);
-                        foreach (var rightEntry in inputExpression.ParsedRightNode.Entries) {
-                            parsedNode.AddEntry (rightEntry);
-                        }
-                        PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
-                        return parsedNode;
-                    }
-                }
-                if (leftType == ExpressionType.OrElse) {
-                    // If the left node is an OR node...
-
-                    // And the right node is an AND node... Since the Top Level Node is an Or node, add the right Entries object to the list as an individual entry. Then add each left entry as an individual entry to the list
-                    if (rightType == ExpressionType.AndAlso) {
-                        parsedNode.AddEntry (inputExpression.ParsedRightNode.Entries);
-                        foreach (var leftEntry in inputExpression.ParsedLeftNode.Entries) {
-                            parsedNode.AddEntry (leftEntry);
-                        }
-                        PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
-                        return parsedNode;
-                    }
-                    // And the right node is an OR Node since the top level is an OR node, and both child nodes are OR nodes, the output list should be one list of entries in a greater OR statement
-                    if (rightType == ExpressionType.OrElse) {
-                        foreach (var leftEntry in inputExpression.ParsedLeftNode.Entries) {
-                            parsedNode.AddEntry (leftEntry);
-                        }
-                        foreach (var rightEntry in inputExpression.ParsedRightNode.Entries) {
-                            parsedNode.AddEntry (rightEntry);
-                        }
-                        PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
-                        return parsedNode;
-                    }
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
+                    return parsedNode;
                 }
             }
+            if (primaryType == ExpressionType.OrElse) {
+                // If the Primary Node is an OR node...
+                PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::PrimaryIsOrElse");
+                // And the Secondary Node is an AND node... Since the Top Level Node is an Or node, add the secondary entries object to the list as an individual entry. Then add each primary entry as an individual entry to the list
+                if (secondaryType == ExpressionType.AndAlso) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsAndAlso");
+                    parsedNode.AddEntry (secondaryParsedNode.Entries);
+                    foreach (var primaryEntry in primaryParsedNode.Entries) {
+                        parsedNode.AddEntry (primaryEntry);
+                    }
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
+                    return parsedNode;
+                }
+                // And the Secondary Node is an OR Node since the top level is an OR node, and both child nodes are OR nodes, the output list should be one list of entries in a greater OR statement
+                if (secondaryType == ExpressionType.OrElse) {
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseAnd]::SecondaryIsOrElse");
+                    foreach (var primaryEntry in primaryParsedNode.Entries) {
+                        parsedNode.AddEntry (primaryEntry);
+                    }
+                    foreach (var secondaryEntry in secondaryParsedNode.Entries) {
+                        parsedNode.AddEntry (secondaryEntry);
+                    }
+                    PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
+                    return parsedNode;
+                }
+            }
+            PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::ReachedUnexpectedEnd");
             PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::ParseOr]::End");
             return parsedNode;
         }
@@ -256,8 +365,9 @@ namespace TreeToString.ExtendedBinaryExpression {
             if (inputExpression.NodeType == ExpressionType.MemberAccess) {
                 PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::Parse]::InputExpression.NodeType == MemberAccess");
                 var memberEntry = ((MemberExpression) inputExpression.Node).Expression.ToString ();
-                ParsedNode parsedNode = new ParsedNode (inputExpression.NodeType, memberEntry);
+                ParsedNode parsedNode = new ParsedNode (inputExpression, inputExpression.NodeType, memberEntry);
                 PSLogger.WritePsDebug ("[ExtendedBinaryExpressionParser::Parse]::End");
+                parsedNode.StringEntries.Add (parsedNode.Entries[0].ToString ());
                 return parsedNode;
             }
 

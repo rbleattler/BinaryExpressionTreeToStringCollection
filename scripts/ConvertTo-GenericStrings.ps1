@@ -22,6 +22,6 @@ $AllStrings = foreach ($string in $testStrings) {
     $newString
 }
 
-$AllStrings = $AllStrings | Select-Object -Unique | Sort-Object -Property Length
+$AllStrings = $AllStrings.Replace('  ',' ') | Select-Object -Unique | Sort-Object -Property Length
 
 Set-Content -Path "$PSScriptRoot\TestStrings.txt" -Value $AllStrings
